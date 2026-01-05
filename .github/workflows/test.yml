@@ -1,0 +1,29 @@
+name: Conan Windows Env Vars Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-windows:
+    runs-on: windows-2022
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+      
+      - name: Install Visual Studio Build Tools
+        run: |
+          choco install visualstudio2022buildtools --packageParameters \"--add Microsoft.VisualStudio.Workload.NativeDesktop --passive --norestart\"
+      
+      - name: Install Conan\n        run: pip install conan==2.24.0\n      \n      - name: Verify Conan Installation\n        run: conan --version\n      \n      - name: Run Single Test\n        run: conan create . --build=missing\n      \n      - name: Run Stress Test (10 iterations)\n        run: python test_runner.py --runs 10\n        continue-on-error: true\n      \n      - name: Upload Test Results\n        if: always()\n        uses: actions/upload-artifact@v3\n        with:\n          name: test-results\n          path: test_results.json\n"
