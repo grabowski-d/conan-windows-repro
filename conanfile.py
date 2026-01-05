@@ -43,6 +43,7 @@ class MyPackageConan(ConanFile):
 
     def _check_env_vars(self):
         """Check critical Windows environment variables"""
+        # Critical variables for Windows builds
         critical_vars = [
             'ProgramData',
             'SystemRoot',
@@ -59,25 +60,53 @@ class MyPackageConan(ConanFile):
             'NUMBER_OF_PROCESSORS',
         ]
         
+        # Visual Studio related variables
+        vs_vars = [
+            'VSINSTALLDIR',
+            'VisualStudioVersion',
+            'VCINSTALLDIR',
+            'VCToolsInstallDir',
+            'INCLUDE',
+            'LIB',
+        ]
+        
+        all_critical = critical_vars + vs_vars
         missing_vars = []
         present_vars = []
         
-        for var in critical_vars:
+        for var in all_critical:
             value = os.environ.get(var)
             if value:
-                present_vars.append((var, value[:50] + '...' if len(value) > 50 else value))
+                # Truncate long values
+                display_val = value[:40] + '...' if len(value) > 40 else value
+                present_vars.append((var, display_val))
             else:
                 missing_vars.append(var)
         
         # Log present variables
-        for var, val in present_vars:
-            self.output.info(f"[OK] {var}: {val}")
+        if present_vars:
+            for var, val in present_vars:
+                self.output.info(f"[PRESENT] {var}: {val}")
         
-        # Log missing variables - THIS IS THE ISSUE
+        # Log missing variables
         if missing_vars:
-            self.output.warning(f"[MISSING] MISSING VARIABLES ({len(missing_vars)}): {', '.join(missing_vars)}")
+            critical_missing = [v for v in missing_vars if v in critical_vars]
+            vs_missing = [v for v in missing_vars if v in vs_vars]
+            
+            if critical_missing:
+                self.output.warning(
+                    f"[CRITICAL] MISSING {len(critical_missing)} critical vars: {', '.join(critical_missing[:3])}{'...' if len(critical_missing) > 3 else ''}"
+                )
+            
+            if vs_missing:
+                self.output.info(
+                    f"[INFO] {len(vs_missing)} Visual Studio vars not set (may be OK): {', '.join(vs_missing[:2])}{'...' if len(vs_missing) > 2 else ''}"
+                )
         else:
-            self.output.success("[OK] All critical environment variables present")
+            self.output.success(f"[OK] All {len(all_critical)} environment variables present")
         
-        # Full env dump for debugging
-        self.output.verbose(f"\nFull environment dump:\n{os.environ}")
+        # Detailed diagnostics
+        self.output.verbose(f"\nPython: {sys.version}")
+        self.output.verbose(f"Python executable: {sys.executable}")
+        self.output.verbose(f"System platform: {sys.platform}")
+        self.output.verbose(f"Current directory: {os.getcwd()}")
