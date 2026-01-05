@@ -14,32 +14,39 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Set up Python
+      - name: Set up Python 3.7
         uses: actions/setup-python@v4
         with:
           python-version: '3.7'
       
+      - name: Verify Python Installation
+        run: |
+          python --version
+          python -m pip --version
+      
       - name: Install CMake
         uses: lukka/get-cmake@latest
+        with:
+          cmake-version: 3.31.6
       
-      - name: Install Visual Studio Build Tools
+      - name: Verify CMake Installation
+        run: cmake --version
+      
+      - name: Install Visual Studio Build Tools 2022
         run: |
           choco install visualstudio2022buildtools --packageParameters "--add Microsoft.VisualStudio.Workload.NativeDesktop --passive --norestart" || true
       
-      - name: Install pipx
-        run: pip install pipx
-      
-      - name: Install Conan via pipx with conan2 alias
+      - name: Install Conan 2.24.0 via pip
         run: |
-          pipx install conan==2.24.0 --pip-args "--no-cache-dir"
-          pipx inject conan --force-reinstall
-          echo "Verifying installation:"
-          pipx list
+          python -m pip install --upgrade pip
+          python -m pip install conan==2.24.0
       
       - name: Verify Conan Installation
         run: |
-          python -m conans.client.command version
-          python -c "from conans import __version__; print(f'Conan version: {__version__}')"
+          python -m conans.client.command --version
+          echo.
+          echo "Python info:"
+          python --version
       
       - name: Detect Conan Profile
         run: |
