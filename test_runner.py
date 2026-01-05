@@ -28,7 +28,7 @@ class TestRunner:
         try:
             # Clean cache to increase likelihood of triggering race condition
             subprocess.run(
-                ["conan", "remove", "mypkg/1.0", "-c"],
+                [sys.executable, "-m", "conans.client.command", "remove", "mypkg/1.0", "-c"],
                 cwd=str(self.project_dir),
                 capture_output=True,
                 timeout=30
@@ -44,7 +44,7 @@ class TestRunner:
         
         try:
             result = subprocess.run(
-                ["conan", "create", ".", "--build=missing"],
+                [sys.executable, "-m", "conans.client.command", "create", ".", "--build=missing"],
                 cwd=str(self.project_dir),
                 capture_output=True,
                 text=True,
