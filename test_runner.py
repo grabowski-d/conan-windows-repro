@@ -28,7 +28,7 @@ class TestRunner:
         try:
             # Clean cache to increase likelihood of triggering race condition
             subprocess.run(
-                [sys.executable, "-m", "conans.client.command", "remove", "mypkg/1.0", "-c"],
+                ['conan', 'remove', 'mypkg/1.0', '-c'],
                 cwd=str(self.project_dir),
                 capture_output=True,
                 timeout=30
@@ -44,7 +44,7 @@ class TestRunner:
         
         try:
             result = subprocess.run(
-                [sys.executable, "-m", "conans.client.command", "create", ".", "--build=missing"],
+                ['conan', 'create', '.', '--build=missing'],
                 cwd=str(self.project_dir),
                 capture_output=True,
                 text=True,
@@ -75,7 +75,7 @@ class TestRunner:
             print(f"Status: {'FAIL' if (is_failed or result.returncode != 0) else 'PASS'}")
             
             if is_failed or result.returncode != 0:
-                print("\nOutput:")
+                print("\nOutput (last 2000 chars):")
                 print(output[-2000:])  # Last 2000 chars
                 return False
             
