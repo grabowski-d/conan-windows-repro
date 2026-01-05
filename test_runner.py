@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Automated test runner for reproducing Conan Windows env vars issue.
 Runs conan create multiple times to catch the ~25% intermittent failure rate.
@@ -129,11 +130,11 @@ class TestRunner:
         print(f"{'='*70}")
         
         if failed > 0:
-            print(f"\n⚠ ISSUE REPRODUCED! {failed}/{self.runs} runs failed.")
+            print(f"\n[WARNING] ISSUE REPRODUCED! {failed}/{self.runs} runs failed.")
             print(f"Failure rate: {100*failed/self.runs:.1f}%")
             print("\nThis indicates the Windows environment variables issue is present.")
         else:
-            print(f"\n✓ No failures detected in {self.runs} runs.")
+            print(f"\n[OK] No failures detected in {self.runs} runs.")
             print("Issue may not be reproducible in current environment.")
         
         # Save results
