@@ -1,0 +1,53 @@
+# Conan
+.conan2/
+.conaninfo.txt
+conaninfo.txt
+conanfile.txt
+graph_info.json
+
+# Build artifacts
+build/
+build_debug/
+build_release/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+Makefile
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test results
+test_results.json
+env_dump.json
+env_before_cmake.json
+conan_verbose.log
+env_dump.txt
+system_info.txt
+
+# Temporary files
+*.tmp
+*.temp
