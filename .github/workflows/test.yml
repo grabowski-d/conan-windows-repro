@@ -32,6 +32,9 @@ jobs:
       - name: Verify Conan Installation
         run: conan --version
       
+      - name: Detect Conan Profile
+        run: conan profile detect --force
+      
       - name: Run Single Test
         run: conan create . --build=missing
       
