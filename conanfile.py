@@ -71,13 +71,13 @@ class MyPackageConan(ConanFile):
         
         # Log present variables
         for var, val in present_vars:
-            self.output.info(f"✓ {var}: {val}")
+            self.output.info(f"[OK] {var}: {val}")
         
         # Log missing variables - THIS IS THE ISSUE
         if missing_vars:
-            self.output.warning(f"✗ MISSING VARIABLES ({len(missing_vars)}): {', '.join(missing_vars)}")
+            self.output.warning(f"[MISSING] MISSING VARIABLES ({len(missing_vars)}): {', '.join(missing_vars)}")
         else:
-            self.output.success("✓ All critical environment variables present")
+            self.output.success("[OK] All critical environment variables present")
         
         # Full env dump for debugging
         self.output.verbose(f"\nFull environment dump:\n{os.environ}")
