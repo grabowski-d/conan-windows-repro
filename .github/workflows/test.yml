@@ -41,20 +41,30 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install conan==2.24.0
       
-      - name: Verify Conan Installation
+      - name: Verify Conan Installation and PATH
         run: |
-          python -m conans.client.command --version
-          echo.
-          echo "Python info:"
-          python --version
+          python -m pip show conan
+          Write-Host "Checking for conan in PATH..."
+          where.exe conan || Write-Host "conan not in PATH, checking via Python..."
+          python -c "from conans import __version__; print(f'Conan Python module version: {__version__}')"
+      
+      - name: Test conan command
+        run: |
+          conan --version
+        continue-on-error: true
+      
+      - name: Test conan via python module
+        run: |
+          python -c "from conans.cli import main_cli; main_cli(['--version'])"
+        continue-on-error: true
       
       - name: Detect Conan Profile
         run: |
-          python -m conans.client.command profile detect --force
+          conan profile detect --force
       
       - name: Run Single Test
         run: |
-          python -m conans.client.command create . --build=missing
+          conan create . --build=missing
       
       - name: Run Stress Test (10 iterations)
         run: |
