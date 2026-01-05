@@ -26,20 +26,32 @@ jobs:
         run: |
           choco install visualstudio2022buildtools --packageParameters "--add Microsoft.VisualStudio.Workload.NativeDesktop --passive --norestart" || true
       
-      - name: Install Conan
-        run: pip install conan==2.24.0
+      - name: Install pipx
+        run: pip install pipx
+      
+      - name: Install Conan via pipx with conan2 alias
+        run: |
+          pipx install conan==2.24.0 --pip-args "--no-cache-dir"
+          pipx inject conan --force-reinstall
+          echo "Verifying installation:"
+          pipx list
       
       - name: Verify Conan Installation
-        run: conan --version
+        run: |
+          python -m conans.client.command version
+          python -c "from conans import __version__; print(f'Conan version: {__version__}')"
       
       - name: Detect Conan Profile
-        run: conan profile detect --force
+        run: |
+          python -m conans.client.command profile detect --force
       
       - name: Run Single Test
-        run: conan create . --build=missing
+        run: |
+          python -m conans.client.command create . --build=missing
       
       - name: Run Stress Test (10 iterations)
-        run: python test_runner.py --runs 10
+        run: |
+          python test_runner.py --runs 10
         continue-on-error: true
       
       - name: Upload Test Results
