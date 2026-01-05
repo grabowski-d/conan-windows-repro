@@ -61,9 +61,9 @@ jobs:
         run: |
           conan create . --build=missing
       
-      - name: Run Stress Test (10 iterations)
+      - name: Run Stress Test (30 iterations)
         run: |
-          python test_runner.py --runs 10
+          python test_runner.py --runs 30
         continue-on-error: true
       
       - name: Upload Test Results
