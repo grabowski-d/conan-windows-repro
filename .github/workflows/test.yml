@@ -24,10 +24,11 @@ jobs:
           python --version
           python -m pip --version
       
-      - name: Install CMake
+      - name: Install CMake and Ninja
         uses: lukka/get-cmake@latest
         with:
-          cmake-version: 3.31.6
+          cmakeVersion: latest
+          ninjaVersion: latest
       
       - name: Verify CMake Installation
         run: cmake --version
