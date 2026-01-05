@@ -1,6 +1,6 @@
 # Setup Versions & Configuration
 
-**Last Updated:** 2026-01-05 18:36 CET  
+**Last Updated:** 2026-01-05 19:38 CET  
 **Status:** Configuration locked for reproducibility
 
 ## Software Versions
@@ -54,28 +54,31 @@ choco install visualstudio2022buildtools \
 
 ## Command Invocation Pattern
 
-### Why `python -m conans.client.command` instead of `conan`?
+### How to Use Conan After pip Install
 
-When using `pip install conan`, the command line entry point may not be available in GitHub Actions environment. Using the module directly is more reliable:
+When you install Conan via `pip install conan`, the command is available directly:
 
 ```bash
-# This might not work in CI:
+# This works immediately after pip install
 conan --version
-
-# This always works:
-python -m conans.client.command --version
+conan profile detect --force
+conan create . --build=missing
 ```
+
+**Why not `python -m conans.client.command`?**
+
+The module structure changed in Conan 2.x. There is no `conans.client.command` module - this was a Conan 1.x pattern. In Conan 2.x, the CLI is accessed directly via the `conan` executable installed by pip.
 
 ### Test Execution
 
 **Profile Detection:**
 ```bash
-python -m conans.client.command profile detect --force
+conan profile detect --force
 ```
 
 **Single Test:**
 ```bash
-python -m conans.client.command create . --build=missing
+conan create . --build=missing
 ```
 
 **Stress Test (10 iterations):**
@@ -83,11 +86,25 @@ python -m conans.client.command create . --build=missing
 python test_runner.py --runs 10
 ```
 
+### Python Module Access
+
+If you need to access Conan via Python:
+
+```python
+# Version check
+from conans import __version__
+print(f'Conan version: {__version__}')
+
+# CLI invocation (advanced)
+from conans.cli import main_cli
+main_cli(['--version'])
+```
+
 ## Environment Variables Checked
 
 ### Critical Windows Variables
 - `ProgramData` - Windows program data directory
-- `SystemRoot` - Windows system directory (usually C:\Windows)
+- `SystemRoot` - Windows system directory (usually C:\\Windows)
 - `COMSPEC` - Command interpreter (cmd.exe)
 - `PATH` - Executable search path
 - `PATHEXT` - Executable extensions
@@ -126,13 +143,13 @@ python test_runner.py --runs 10
     "run": 1,
     "status": "PASS",
     "returncode": 0,
-    "timestamp": "2026-01-05T18:36:45.123456"
+    "timestamp": "2026-01-05T19:38:45.123456"
   },
   {
     "run": 2,
     "status": "FAIL",
     "returncode": 1,
-    "timestamp": "2026-01-05T18:36:52.654321"
+    "timestamp": "2026-01-05T19:38:52.654321"
   }
 ]
 ```
@@ -145,11 +162,16 @@ If you need to debug locally:
 # Install Conan
 python -m pip install conan==2.24.0
 
+# Verify installation
+conan --version
+where.exe conan  # Windows
+which conan      # Linux/macOS
+
 # Detect profile
-python -m conans.client.command profile detect --force
+conan profile detect --force
 
 # Run single test
-python -m conans.client.command create . --build=missing
+conan create . --build=missing
 
 # Run stress test
 python test_runner.py --runs 10
@@ -158,10 +180,46 @@ python test_runner.py --runs 10
 cat test_results.json | python -m json.tool
 ```
 
+## Troubleshooting
+
+### "conan: command not found"
+
+1. Verify Conan is installed:
+   ```bash
+   python -m pip list | grep conan
+   ```
+
+2. Check if Scripts directory is in PATH:
+   ```bash
+   # Windows (PowerShell)
+   Write-Host $env:PATH
+   
+   # Linux/macOS
+   echo $PATH
+   ```
+
+3. If not in PATH, reinstall with pip:
+   ```bash
+   python -m pip install --force-reinstall conan==2.24.0
+   ```
+
+### Python Module Not Found
+
+If `from conans import ...` fails:
+
+```bash
+# Check if conans package is installed
+python -c "import conans; print(conans.__file__)"
+
+# If not found, reinstall
+python -m pip install --force-reinstall conan==2.24.0
+```
+
 ## Related Files
 
 - `.github/workflows/test.yml` - GitHub Actions workflow
-- `test_runner.py` - Stress test harness
+- `test_runner.py` - Stress test harness  
 - `conanfile.py` - Conan recipe with env var diagnostics
 - `CMakeLists.txt` - CMake build configuration
 - `test_results.json` - Test results artifact
+- `UNICODE_FIX.md` - Notes on Python 3.7 Unicode compatibility
