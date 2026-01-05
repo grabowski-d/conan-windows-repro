@@ -17,31 +17,31 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.7'
+          python-version: '3.11'
       
       - name: Install CMake
         uses: lukka/get-cmake@latest
       
       - name: Install Visual Studio Build Tools
         run: |
-          choco install visualstudio2022buildtools --packageParameters \"--add Microsoft.VisualStudio.Workload.NativeDesktop --passive --norestart\"
+          choco install visualstudio2022buildtools --packageParameters "--add Microsoft.VisualStudio.Workload.NativeDesktop --passive --norestart" || true
       
       - name: Install Conan
         run: pip install conan==2.24.0
+      
       - name: Verify Conan Installation
         run: conan --version
-        
+      
       - name: Run Single Test
         run: conan create . --build=missing
-        
+      
       - name: Run Stress Test (10 iterations)
         run: python test_runner.py --runs 10
         continue-on-error: true
-        
+      
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: test-results
           path: test_results.json
-          
