@@ -20,6 +20,7 @@ class MyPackageConanAdvanced(ConanFile):
         super().__init__(*args, **kwargs)
         self._env_snapshots = []
         self._subprocess_calls = []
+        self._critical_failure = False
     
     def layout(self):
         self._snapshot_env("layout")
@@ -59,6 +60,12 @@ class MyPackageConanAdvanced(ConanFile):
     def package(self):
         self._snapshot_env("package")
         self._report_findings()
+        
+        # Only raise if critical failure detected
+        if self._critical_failure:
+            raise RuntimeError(
+                "Critical environment variable issues detected. See logs above for details."
+            )
 
     def _snapshot_env(self, location):
         """Take snapshot of environment variables"""
@@ -73,7 +80,8 @@ class MyPackageConanAdvanced(ConanFile):
         if hasattr(self, 'output'):
             missing = [var for var in CRITICAL_VARS if not snapshot['vars'][var]]
             if missing:
-                self.output.error(f"[{location}] MISSING: {', '.join(missing)}")
+                self.output.error(f"[{location}] CRITICAL MISSING: {', '.join(missing)}")
+                self._critical_failure = True
 
     def _test_subprocess_inheritance(self):
         """Test if subprocess properly inherits environment"""
@@ -97,6 +105,7 @@ class MyPackageConanAdvanced(ConanFile):
                 self.output.success(f"[TEST 1A] subprocess inherits: ProgramData={program_data}")
             else:
                 self.output.error(f"[TEST 1A] FAILED: ProgramData not inherited: {program_data}")
+                self._critical_failure = True
         except Exception as e:
             self.output.error(f"[TEST 1A] Exception: {e}")
         
@@ -114,6 +123,7 @@ class MyPackageConanAdvanced(ConanFile):
                 self.output.success(f"[TEST 1B] explicit env copy works: SystemRoot={system_root}")
             else:
                 self.output.error(f"[TEST 1B] FAILED: SystemRoot not in env copy: {system_root}")
+                self._critical_failure = True
         except Exception as e:
             self.output.error(f"[TEST 1B] Exception: {e}")
         
@@ -170,6 +180,7 @@ class MyPackageConanAdvanced(ConanFile):
             )
             for issue_type, vars_list, timestamp in results['inconsistent'][:3]:
                 self.output.error(f"  - {issue_type}: {vars_list}")
+            self._critical_failure = True
         else:
             self.output.success(f"[TEST 2] No race conditions in {total_checks} concurrent checks")
 
@@ -193,9 +204,10 @@ class MyPackageConanAdvanced(ConanFile):
                 missing.append(var)
         
         if missing:
-            raise RuntimeError(
-                f"Critical environment variables missing at {location}: {', '.join(missing)}"
+            self.output.error(
+                f"[{location}] Critical environment variables missing: {', '.join(missing)}"
             )
+            self._critical_failure = True
 
     def _monitor_environ_modifications(self):
         """Monitor if os.environ is being modified"""
@@ -225,6 +237,8 @@ class MyPackageConanAdvanced(ConanFile):
             self.output.warning(f"[TEST 3] Environment changed during execution:")
             for var, old, new in changes:
                 self.output.warning(f"  {var}: '{old}' -> '{new}'")
+                if old and not new:  # Variable disappeared
+                    self._critical_failure = True
         else:
             self.output.success("[TEST 3] Environment stable - no modifications detected")
 
@@ -259,6 +273,7 @@ class MyPackageConanAdvanced(ConanFile):
                 else:
                     self.output.error(f"[TEST 4-{test_name}] {description}: FAILED")
                     self.output.error(f"  Output: {result.stdout[:100]}")
+                    self._critical_failure = True
             except Exception as e:
                 self.output.error(f"[TEST 4-{test_name}] {description}: Exception - {e}")
 
@@ -294,3 +309,13 @@ class MyPackageConanAdvanced(ConanFile):
             )
         else:
             self.output.success("\n✓ All environment checks passed")
+        
+        # Final verdict
+        if self._critical_failure:
+            self.output.error("\n" + "="*70)
+            self.output.error("TEST RESULT: FAILURE - Critical issues detected")
+            self.output.error("="*70)
+        else:
+            self.output.success("\n" + "="*70)
+            self.output.success("TEST RESULT: SUCCESS - All tests passed")
+            self.output.success("="*70)
