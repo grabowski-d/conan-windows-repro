@@ -61,7 +61,7 @@ jobs:
             $exitCode = $LASTEXITCODE
             
             # Check for critical issues
-            if ($output -match "CRITICAL MISSING|RuntimeError.*environment variables missing|RACE CONDITION DETECTED") {
+            if ($output -match "CRITICAL MISSING|RACE CONDITION DETECTED|TEST RESULT: FAILURE") {
               Write-Host "::error::Issue detected at iteration $i!"
               $failures += @{
                 iteration = $i
@@ -79,8 +79,11 @@ jobs:
           }
           
           $totalTime = (Get-Date) - $startTime
+          Write-Host ""
+          Write-Host "="*80
           Write-Host "Completed $iterations iterations in $($totalTime.TotalSeconds)s"
           Write-Host "Total failures: $($failures.Count) ($([math]::Round($failures.Count/$iterations*100, 2))%)"
+          Write-Host "="*80
           
           if ($failures.Count -gt 0) {
             Write-Host "::error::Found $($failures.Count) failures!"
@@ -96,6 +99,8 @@ jobs:
             }
             
             exit 1
+          } else {
+            Write-Host "::notice::SUCCESS - No environment issues detected in PowerShell!"
           }
         env:
           ITERATIONS: ${{ github.event.inputs.iterations }}
@@ -137,24 +142,36 @@ jobs:
       - name: Rapid Iteration Test (CMD)
         shell: cmd
         run: |
+          @echo off
           echo Running iterations with CMD...
           set FAILURES=0
+          set ITERATIONS=200
           
-          for /L %%i in (1,1,200) do (
+          for /L %%i in (1,1,%ITERATIONS%) do (
             conan create . --name=mypkg --version=1.0 -sf=conanfile_advanced.py > output_%%i.txt 2>&1
             
-            findstr /C:"CRITICAL MISSING" /C:"RACE CONDITION" output_%%i.txt > nul
+            findstr /C:"CRITICAL MISSING" /C:"RACE CONDITION" /C:"TEST RESULT: FAILURE" output_%%i.txt > nul
             if not errorlevel 1 (
               echo ::error::Issue detected at iteration %%i
               set /A FAILURES+=1
             )
             
-            if %%i%%50==0 echo Progress: %%i/200
+            rem Progress every 50 iterations
+            set /A MOD=%%i %% 50
+            if !MOD!==0 echo Progress: %%i/%ITERATIONS% - Failures: !FAILURES!
           )
           
+          echo.
+          echo ================================================================================
+          echo Completed %ITERATIONS% iterations
+          echo Total failures: %FAILURES%
+          echo ================================================================================
+          
           if %FAILURES% GTR 0 (
-            echo ::error::Found %FAILURES% failures!
+            echo ::error::Found %FAILURES% failures in CMD environment!
             exit /b 1
+          ) else (
+            echo ::notice::SUCCESS - No environment issues detected in CMD!
           )
       
       - name: Upload Failure Logs
@@ -201,23 +218,31 @@ jobs:
           for ((i=1; i<=ITERATIONS; i++)); do
             output=$(conan create . --name=mypkg --version=1.0 -sf=conanfile_advanced.py 2>&1)
             
-            if echo "$output" | grep -q "CRITICAL MISSING\|RACE CONDITION\|RuntimeError.*environment"; then
+            # Check for critical issues - fixed regex
+            if echo "$output" | grep -E "CRITICAL MISSING|RACE CONDITION|TEST RESULT: FAILURE" > /dev/null 2>&1; then
               echo "::error::Issue detected at iteration $i!"
               echo "$output" > "failure_bash_$i.txt"
               ((FAILURES++))
             fi
             
+            # Progress every 50 iterations
             if [ $((i % 50)) -eq 0 ]; then
               echo "Progress: $i/$ITERATIONS - Failures: $FAILURES"
             fi
           done
           
+          echo ""
+          echo "================================================================================"
+          echo "Completed $ITERATIONS iterations with Git Bash"
           echo "Total failures: $FAILURES out of $ITERATIONS"
+          echo "================================================================================"
           
           if [ $FAILURES -gt 0 ]; then
             echo "::error::Found $FAILURES failures in Git Bash environment!"
-            echo "This matches your GitLab Runner environment (Git Bash)!"
+            echo "::error::This matches your GitLab Runner environment (Git Bash)!"
             exit 1
+          else
+            echo "::notice::SUCCESS - No environment issues detected in Git Bash!"
           fi
       
       - name: Upload Failure Logs
@@ -266,14 +291,21 @@ jobs:
           for ($i = 1; $i -le 100; $i++) {
             $output = conan create . --name=mypkg --version=1.0 -sf=conanfile_advanced.py 2>&1 | Out-String
             
-            if ($output -match "CRITICAL MISSING|RACE CONDITION") {
+            if ($output -match "CRITICAL MISSING|RACE CONDITION|TEST RESULT: FAILURE") {
               $failures++
               Write-Host "::error::Instance ${{ matrix.instance }} - Failure at iteration $i"
             }
+            
+            if ($i % 25 -eq 0) {
+              Write-Host "Instance ${{ matrix.instance }}: $i/100 - Failures: $failures"
+            }
           }
           
-          Write-Host "Instance ${{ matrix.instance }} completed: $failures failures"
+          Write-Host ""
+          Write-Host "Instance ${{ matrix.instance }} completed: $failures failures out of 100"
           
           if ($failures -gt 0) {
             exit 1
+          } else {
+            Write-Host "::notice::Instance ${{ matrix.instance }} - SUCCESS!"
           }
