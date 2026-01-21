@@ -3,24 +3,8 @@ from conan.tools.cmake import cmake_layout, CMakeToolchain
 import os
 import sys
 
-# Global scope - check environment variables immediately
-print("=" * 80)
-print("[GLOBAL SCOPE] Environment Variables Check - BEFORE ConanFile class")
-print("=" * 80)
-
+# Critical environment variables to monitor
 CRITICAL_VARS = ['ProgramData', 'SystemRoot', 'COMSPEC', 'PATH', 'TEMP', 'TMP']
-
-for var in CRITICAL_VARS:
-    value = os.environ.get(var)
-    if value:
-        display = value[:50] + '...' if len(value) > 50 else value
-        print(f"[GLOBAL][OK] {var}: {display}")
-    else:
-        print(f"[GLOBAL][MISSING] {var}: NOT FOUND")
-
-print(f"[GLOBAL] Python: {sys.version}")
-print(f"[GLOBAL] CWD: {os.getcwd()}")
-print("=" * 80)
 
 
 class MyPackageConan(ConanFile):
@@ -32,7 +16,8 @@ class MyPackageConan(ConanFile):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._log_env("[__INIT__]")
+        # Check environment early but don't fail yet
+        self._check_env_silent("[__INIT__]")
 
     def layout(self):
         self._log_env("[LAYOUT]")
@@ -55,6 +40,7 @@ class MyPackageConan(ConanFile):
         self.output.info("[BUILD] Skipping actual build - just checking environment")
         
         # Optional: uncomment to enable real build for verification
+        # from conan.tools.cmake import CMake
         # cmake = CMake(self)
         # cmake.configure()
         # cmake.build()
@@ -63,6 +49,27 @@ class MyPackageConan(ConanFile):
         """Package phase - minimal"""
         self._log_env("[PACKAGE]")
         # No actual packaging needed for env var testing
+        self.output.info("[PACKAGE] Skipping packaging - test complete")
+
+    def _check_env_silent(self, location):
+        """Silent environment check without output (for __init__)
+        
+        Args:
+            location: String identifier for the calling method
+        """
+        missing = []
+        for var in CRITICAL_VARS:
+            if not os.environ.get(var):
+                missing.append(var)
+        
+        # Just store the result, don't log yet (output may not be available)
+        if not hasattr(self, '_env_checks'):
+            self._env_checks = []
+        self._env_checks.append({
+            'location': location,
+            'missing': missing,
+            'total': len(CRITICAL_VARS)
+        })
 
     def _log_env(self, location, detailed=False):
         """Check and log critical Windows environment variables
@@ -71,6 +78,10 @@ class MyPackageConan(ConanFile):
             location: String identifier for the calling method
             detailed: If True, log all variables. If False, only log missing ones.
         """
+        # Use safe output method
+        if not hasattr(self, 'output'):
+            return
+            
         self.output.info("=" * 70)
         self.output.info(f"{location} Environment Variables Check")
         self.output.info("=" * 70)
@@ -112,6 +123,8 @@ class MyPackageConan(ConanFile):
             )
         
         # Additional diagnostics
-        self.output.info(f"{location} Python: {sys.executable}")
-        self.output.info(f"{location} CWD: {os.getcwd()}")
+        if detailed:
+            self.output.info(f"{location} Python: {sys.executable}")
+            self.output.info(f"{location} CWD: {os.getcwd()}")
+        
         self.output.info("=" * 70)
