@@ -1,24 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 project(mypkg CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Minimal CMakeLists.txt for Conan testing
+# This file is required by cmake_layout() but we skip actual build
 
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+message(STATUS "CMake configuration for environment testing only")
+message(STATUS "No actual build will be performed")
 
-# Add library
-add_library(mypkg STATIC
-    src/math.cpp
-)
+# Dummy target to satisfy Conan
+add_library(${PROJECT_NAME} INTERFACE)
 
-target_include_directories(mypkg PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-# Install
-install(TARGETS mypkg DESTINATION lib)
-install(FILES include/math.h DESTINATION include)
+install(TARGETS ${PROJECT_NAME})
