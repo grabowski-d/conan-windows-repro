@@ -1,5 +1,4 @@
 from conan import ConanFile
-from conan.tools.cmake import cmake_layout, CMakeToolchain
 import os
 import sys
 import subprocess
@@ -14,7 +13,6 @@ class MyPackageConanAdvanced(ConanFile):
     name = "mypkg"
     version = "1.0"
     settings = "os", "compiler", "build_type", "arch"
-    exports_sources = "CMakeLists.txt"
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -23,10 +21,17 @@ class MyPackageConanAdvanced(ConanFile):
         self._critical_failure = False
     
     def layout(self):
+        """Setup layout - optional for testing"""
         self._snapshot_env("layout")
-        cmake_layout(self)
+        try:
+            from conan.tools.cmake import cmake_layout
+            cmake_layout(self)
+        except Exception as e:
+            if hasattr(self, 'output'):
+                self.output.info(f"[layout] Skipping cmake_layout: {e}")
 
     def generate(self):
+        """Generate phase - run environment tests"""
         self._snapshot_env("generate_start")
         
         # Test 1: Check if subprocess inherits environment correctly
@@ -35,13 +40,21 @@ class MyPackageConanAdvanced(ConanFile):
         # Test 2: Check for race conditions with threading
         self._test_race_conditions()
         
-        # Generate toolchain
-        tc = CMakeToolchain(self)
-        tc.generate()
+        # Try to generate toolchain (optional)
+        try:
+            from conan.tools.cmake import CMakeToolchain
+            tc = CMakeToolchain(self)
+            tc.generate()
+            if hasattr(self, 'output'):
+                self.output.info("[generate] CMakeToolchain generated successfully")
+        except Exception as e:
+            if hasattr(self, 'output'):
+                self.output.info(f"[generate] Skipping CMakeToolchain: {e}")
         
         self._snapshot_env("generate_end")
 
     def build(self):
+        """Build phase - run more tests, skip actual build"""
         self._snapshot_env("build_start")
         
         # Test 3: Verify environment before any build operations
@@ -58,6 +71,7 @@ class MyPackageConanAdvanced(ConanFile):
         self._snapshot_env("build_end")
 
     def package(self):
+        """Package phase - report findings"""
         self._snapshot_env("package")
         self._report_findings()
         
