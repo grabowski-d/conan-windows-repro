@@ -2,6 +2,16 @@
 
 **Conan Issue:** [#19433 - Windows environment variables intermittently stripped during recipe execution](https://github.com/conan-io/conan/issues/19433)
 
+## 🆕 Latest Updates
+
+**January 21, 2026** - Implemented improvements suggested by [memsharded](https://github.com/memsharded) (Conan co-founder):
+- ⚡ **Ultra-fast testing** - `conan create` now completes in ~2 seconds (no actual build)
+- 🔍 **Multi-location checks** - Environment variables monitored in 6+ locations (global scope, generate, build, etc.)
+- 🤖 **Automated CI** - 300+ test iterations per push, hourly scheduled runs
+- 📊 **Instant failure detection** - Tests fail immediately when env vars go missing
+
+See [MEMSHARDED_IMPROVEMENTS.md](MEMSHARDED_IMPROVEMENTS.md) for detailed documentation.
+
 ## Problem Summary
 
 When running Conan 2.24.0 recipes on Windows, critical system environment variables (`ProgramData`, `SystemRoot`, `COMSPEC`, etc.) are **intermittently missing** during recipe execution (`generate()`, `build()`). This causes CMake to fail discovering Visual Studio.
@@ -19,7 +29,7 @@ When running Conan 2.24.0 recipes on Windows, critical system environment variab
 - **Visual Studio:** 2019 Enterprise or 2022 Enterprise
 - **CI:** GitLab Runner, GitHub Actions, or local Windows shell
 
-## How to Reproduce
+## Quick Start
 
 ### Prerequisites
 
@@ -27,104 +37,172 @@ When running Conan 2.24.0 recipes on Windows, critical system environment variab
 # Install Conan 2.24.0
 pip install conan==2.24.0
 
-# Install CMake
-# (download from https://cmake.org or use chocolatey: choco install cmake)
+# Install CMake 3.31.6 (recommended for testing)
+choco install cmake --version=3.31.6
 
 # Ensure Visual Studio is installed with C++ workload
 ```
 
-### Single Run
+### Single Test (Fast - ~2 seconds)
 
 ```bash
 # Clone this repository
 git clone https://github.com/grabowski-d/conan-windows-repro.git
 cd conan-windows-repro
 
-# Run conan create
+# Detect Conan profile
+conan profile detect --force
+
+# Run single test
 conan create . --build=missing
 ```
 
-### Stress Test (to trigger intermittent failures)
+### Stress Test (Recommended)
 
 ```powershell
-# Run 10 consecutive builds to catch the ~25% failure rate
-python test_runner.py --runs 10
+# Run 50 consecutive builds to catch intermittent failures
+python test_runner.py --runs 50
+
+# Or more intensive testing
+python test_runner.py --runs 200
 ```
 
-## Expected Output (Success)
+### CI Testing
+
+The repository includes GitHub Actions workflow that automatically:
+- Runs quick test on every push
+- Runs 300 stress test iterations (3x100 parallel)
+- Runs 200 rapid-fire tests every hour
+- Fails immediately when env vars go missing
+- Uploads detailed failure logs
+
+Manually trigger workflow:
+1. Go to [Actions tab](https://github.com/grabowski-d/conan-windows-repro/actions)
+2. Select "Conan Windows Env Vars Test"
+3. Click "Run workflow"
+4. Enter desired iteration count
+
+## Expected Output
+
+### Success Case
 
 ```
-mypkg/1.0: Exporting sources
+============================================================
+[GLOBAL SCOPE] Environment Variables Check
+============================================================
+[GLOBAL][OK] ProgramData: C:\ProgramData
+[GLOBAL][OK] SystemRoot: C:\Windows
+[GLOBAL][OK] COMSPEC: C:\Windows\system32\cmd.exe
+...
+
 mypkg/1.0: Calling generate()
-============================================================
-GENERATE() method - Environment Variables Check
-============================================================
-✓ ProgramData: C:\ProgramData
-✓ SystemRoot: C:\Windows
-✓ COMSPEC: C:\Windows\system32\cmd.exe
-✓ PATH: C:\Program Files\...
-✓ All critical environment variables present
+======================================================================
+[GENERATE] Environment Variables Check
+======================================================================
+[GENERATE] [OK] ProgramData: C:\ProgramData
+[GENERATE] SUCCESS: All 6 critical variables present
 
 mypkg/1.0: Calling build()
-============================================================
-BUILD() method - Environment Variables Check
-============================================================
-✓ ProgramData: C:\ProgramData
-✓ SystemRoot: C:\Windows
-✓ COMSPEC: C:\Windows\system32\cmd.exe
-✓ All critical environment variables present
+======================================================================
+[BUILD] Environment Variables Check
+======================================================================
+[BUILD] [OK] ProgramData: C:\ProgramData
+[BUILD] SUCCESS: All 6 critical variables present
+[BUILD] Skipping actual build - just checking environment
 
--- Selecting Windows SDK version 10.0.19041.0
--- The CXX compiler identification is MSVC 19.43.34808.0
--- Build files have been written to: build/...
+mypkg/1.0: Package created
 ```
 
-## Failure Output (Intermittent)
+### Failure Case (If Issue Occurs)
 
 ```
 mypkg/1.0: Calling build()
-============================================================
-BUILD() method - Environment Variables Check
-============================================================
-✗ MISSING VARIABLES (3): ProgramData, SystemRoot, COMSPEC
+======================================================================
+[BUILD] Environment Variables Check
+======================================================================
+[BUILD] [CRITICAL MISSING] ProgramData
+[BUILD] [CRITICAL MISSING] SystemRoot
+[BUILD] FAILURE: 2/6 variables missing: ProgramData, SystemRoot
 
-CMake Error at CMakeLists.txt:2 (project):
-  Generator
-      Visual Studio 17 2022
-  could not find any instance of Visual Studio.
--- Configuring incomplete, errors occurred!
+ERROR: RuntimeError: Critical environment variables missing at [BUILD]: ProgramData, SystemRoot
 ```
+
+## Testing Strategy
+
+Based on memsharded's recommendations, this repository uses a multi-tiered testing approach:
+
+### Tier 1: Minimal Recipe Testing
+- **Speed:** ~2 seconds per iteration
+- **Purpose:** Rapidly iterate to catch intermittent issues
+- **Method:** No actual build, only env var validation
+- **Location:** `conanfile.py` with stripped `build()` method
+
+### Tier 2: Multi-location Monitoring
+- **Locations checked:**
+  - Global scope (before class definition)
+  - `__init__()` method
+  - `layout()` method
+  - `generate()` method
+  - `build()` method
+  - `package()` method
+- **Purpose:** Identify exactly where env vars disappear
+
+### Tier 3: Continuous CI Testing
+- **Quick test:** Single run on every commit
+- **Stress test:** 300 iterations per push (3 parallel runners)
+- **Scheduled test:** 200 iterations every hour
+- **Manual test:** Custom iteration count on demand
+
+## Critical Environment Variables Monitored
+
+1. **ProgramData** - Common application data (originally reported issue)
+2. **SystemRoot** - Windows installation directory
+3. **COMSPEC** - Command processor path
+4. **PATH** - Executable search paths
+5. **TEMP** - Temporary files directory
+6. **TMP** - Alternative temporary files directory
 
 ## Workaround
 
-Set environment variables explicitly in the recipe:
+If you encounter this issue in production, temporarily set variables explicitly:
 
 ```python
 def build(self):
     import os
-    # Workaround: set critical vars explicitly
-    os.environ['ProgramData'] = os.environ.get('ProgramData', 'C:\\ProgramData')
-    os.environ['SystemRoot'] = os.environ.get('SystemRoot', 'C:\\Windows')
-    os.environ['COMSPEC'] = os.environ.get('COMSPEC', 'C:\\Windows\\system32\\cmd.exe')
+    # Workaround: ensure critical vars are present
+    if not os.environ.get('ProgramData'):
+        os.environ['ProgramData'] = 'C:\\ProgramData'
+    if not os.environ.get('SystemRoot'):
+        os.environ['SystemRoot'] = 'C:\\Windows'
+    if not os.environ.get('COMSPEC'):
+        os.environ['COMSPEC'] = 'C:\\Windows\\system32\\cmd.exe'
     
     cmake = CMake(self)
     cmake.configure()
     cmake.build()
 ```
 
-## Investigation Hypothesis
+## Investigation Documents
 
-See `INVESTIGATION.md` for detailed analysis.
+- [MEMSHARDED_IMPROVEMENTS.md](MEMSHARDED_IMPROVEMENTS.md) - Latest improvements based on Conan team feedback
+- [INVESTIGATION.md](INVESTIGATION.md) - Technical root cause analysis
+- [STATUS.md](STATUS.md) - Current reproduction status
+- [LOCAL_TESTING.md](LOCAL_TESTING.md) - Local testing guide
 
-## Files
+## Contributing
 
-- `conanfile.py` - Main recipe with environment variable checking
-- `CMakeLists.txt` - Simple C++ library build configuration
-- `src/math.cpp` - Simple C++ source
-- `include/math.h` - Header file
-- `test_runner.py` - Automated test script for stress testing
-- `INVESTIGATION.md` - Technical investigation and root cause hypothesis
+If you can reproduce this issue:
+
+1. Run the stress test: `python test_runner.py --runs 100`
+2. If failures occur, save the `test_results.json` file
+3. Comment on [Issue #19433](https://github.com/conan-io/conan/issues/19433) with:
+   - Your environment details
+   - Failure rate observed
+   - Test results file
+   - Any patterns you noticed
 
 ## Contact
 
 Original issue reporter: [@grabowski-d](https://github.com/grabowski-d)
+
+Conan team contact: [@memsharded](https://github.com/memsharded) (Diego Rodriguez-Losada, Conan co-founder)
