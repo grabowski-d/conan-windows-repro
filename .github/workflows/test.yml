@@ -11,9 +11,6 @@ on:
         description: 'Number of test iterations'
         required: false
         default: '50'
-  schedule:
-    # Run every hour to catch intermittent issues
-    - cron: '0 * * * *'
 
 jobs:
   # Fast smoke test - runs on every commit
