@@ -1,0 +1,36 @@
+name: Repro
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NO_PROXY: localhost,127.0.0.1,.example.com
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  # Original Conan 2.32.0 code. Expected to FAIL (exit code 1 = reproduced).
+  original:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - run: python -m pip install conan==2.32.0
+      - run: python repro.py
+
+  # Same scenario with _call_method patched to never touch os.environ. Expected to pass.
+  control:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - run: python -m pip install conan==2.32.0
+      - run: python repro.py --fixed
