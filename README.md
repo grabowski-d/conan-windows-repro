@@ -114,7 +114,8 @@ The `--fixed` control run passes, which shows the problem is the modification of
 `.github/workflows/repro.yml` runs on `windows-2022` with Python 3.8:
 
 * `original` – Conan 2.32.0 as released, expected to **fail** (reproduced);
-* `control` – `repro.py --fixed`, expected to pass.
+* `control` – `repro.py --fixed --rounds 10`, expected to pass (one round takes
+  ~30 s on the hosted Windows runner, the original code fails in round 1).
 
 ## Notes
 
