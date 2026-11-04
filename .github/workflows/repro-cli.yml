@@ -27,7 +27,7 @@ jobs:
       - run: python cli/repro_cli.py --runs 20 --keep-going
 
   # Default interpreter switch interval (5 ms), core.download:parallel=8.
-  # Shows the problem without any interpreter tweaks; may need many runs.
+  # Shows the problem without any interpreter tweaks. Expected to FAIL.
   cli-default-switch:
     runs-on: windows-2022
     timeout-minutes: 45

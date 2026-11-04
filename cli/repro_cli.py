@@ -153,7 +153,9 @@ def main():
         run_env.update(CHECK_VARS)
         run_env["REPRO_PKG_COUNT"] = str(args.packages)
         run_env["REPRO_SWITCH_INTERVAL"] = args.switch_interval
-        checks = list(CHECK_VARS) + [k for k in WINDOWS_VARS if k in run_env]
+        # os.environ keys are upper-case on Windows (SYSTEMROOT), so match case-insensitively.
+        windows = {w.upper() for w in WINDOWS_VARS}
+        checks = list(CHECK_VARS) + [k for k in run_env if k.upper() in windows]
         with open(os.path.join(consumer, "expected_env.json"), "w") as f:
             json.dump({"env": run_env, "checks": checks}, f)
 

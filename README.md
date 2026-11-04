@@ -155,16 +155,20 @@ Options: `--runs`, `--packages`, `--parallel`, `--random-vars`,
 `--switch-interval`, `--keep-going`, `--control` (same run with
 `clean_system_proxy=False`). Exit code `1` = reproduced, `2` = unexpected failure.
 
-Results on Linux, Python 3.8, 20 runs each:
+Results (Conan 2.32.0, Python 3.8):
 
-| Setup | OK | env lost | KeyError |
-| --- | --- | --- | --- |
-| `parallel=2`, switch 1e-6 (default) | 8 | 3 | 9 |
-| `parallel=8`, switch 5 ms (Python default) | 19 | 1 | 0 |
-| `--control` (`clean_system_proxy=False`) | 20 | 0 | 0 |
+| Setup | Runner | Runs | OK | env lost | KeyError |
+| --- | --- | --- | --- | --- | --- |
+| `parallel=2`, switch 1e-6 (default) | GitHub `windows-2022` | 20 | 0 | 6 | 14 |
+| `parallel=8`, switch 5 ms (Python default) | GitHub `windows-2022` | 40 | 0 | 35 | 5 |
+| `--control` (`clean_system_proxy=False`) | GitHub `windows-2022` | 20 | 20 | 0 | 0 |
+| `parallel=2`, switch 1e-6 (default) | Linux | 20 | 8 | 3 | 9 |
+| `parallel=8`, switch 5 ms (Python default) | Linux | 20 | 19 | 1 | 0 |
+| `--control` (`clean_system_proxy=False`) | Linux | 20 | 20 | 0 | 0 |
 
-With higher parallelism and 1e-6 almost every run fails with `KeyError` before
-reaching `generate()`, which is why the default is `parallel=2`.
+On Windows the problem shows up in practically every `conan install` even
+without changing the switch interval, i.e. with a completely ordinary setup:
+`clean_system_proxy=True`, `NO_PROXY` set and parallel package downloads.
 
 ## CI
 
@@ -178,13 +182,14 @@ reaching `generate()`, which is why the default is `parallel=2`.
 
 * `cli-original` – `repro_cli.py --runs 20 --keep-going`, expected to **fail**;
 * `cli-default-switch` – `--parallel 8 --switch-interval 0.005`, i.e. without any
-  interpreter tweak; expected to fail, but it is probabilistic;
+  interpreter tweak; expected to **fail**;
 * `cli-control` – `--control`, expected to pass.
 
 ## Notes
 
-* With the default switch interval (5 ms) the race is rarely hit in a short run;
-  `sys.setswitchinterval(1e-6)` makes it show up within the first round.
+* In `repro.py` the race is rarely hit with the default switch interval (5 ms);
+  `sys.setswitchinterval(1e-6)` makes it show up within the first round. The
+  real `conan install` on Windows hits it even with the default interval.
 * The race is not Windows-specific Python code; it also reproduces on Linux.
   It hurts on Windows because losing `SystemRoot` / `ProgramData` / `ComSpec`
   breaks COM, vswhere and Visual Studio detection.
