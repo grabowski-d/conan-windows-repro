@@ -155,7 +155,7 @@ Options: `--runs`, `--packages`, `--parallel`, `--random-vars`,
 `--switch-interval`, `--keep-going`, `--control` (same run with
 `clean_system_proxy=False`). Exit code `1` = reproduced, `2` = unexpected failure.
 
-Results (Conan 2.32.0, Python 3.8):
+Results (Conan 2.32.0, Python 3.8; one run each, the split varies between runs):
 
 | Setup | Runner | Runs | OK | env lost | KeyError |
 | --- | --- | --- | --- | --- | --- |
