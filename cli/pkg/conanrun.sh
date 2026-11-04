@@ -1,0 +1,1 @@
+. "/home/claude/conan-windows-repro/cli/pkg/conanrunenv.sh"

@@ -1,12 +1,17 @@
 # Conan: environment variables lost with `clean_system_proxy=True`
 
 [![Repro](https://github.com/grabowski-d/conan-windows-repro/actions/workflows/repro.yml/badge.svg)](https://github.com/grabowski-d/conan-windows-repro/actions/workflows/repro.yml)
+[![Repro CLI](https://github.com/grabowski-d/conan-windows-repro/actions/workflows/repro-cli.yml/badge.svg)](https://github.com/grabowski-d/conan-windows-repro/actions/workflows/repro-cli.yml)
 
 Related issue: [conan-io/conan#19433](https://github.com/conan-io/conan/issues/19433)
 
 On Windows, system variables such as `SystemRoot`, `ProgramData` or `ComSpec`
 intermittently disappear during Conan runs, which then breaks vswhere / CMake /
-MSVC detection. This repository reproduces the root cause in isolation.
+MSVC detection. This repository reproduces the root cause in two ways:
+
+* `repro.py` – calls `ConanRequester` directly (fast, deterministic);
+* `cli/repro_cli.py` – regular Conan CLI: `conan install` downloading packages
+  from a local `conan_server` in parallel.
 
 ## Root cause
 
@@ -43,7 +48,7 @@ run in threads (e.g. parallel downloads):
 The code only runs when `core.net.http:clean_system_proxy=True` **and** at least
 one proxy variable is set (`NO_PROXY` is enough), otherwise `popped` stays `False`.
 
-## Reproduction
+## Reproduction: direct call (`repro.py`)
 
 `repro.py` uses the real `ConanRequester` from the installed Conan and real HTTP
 requests to a local server. It sets up:
@@ -109,6 +114,58 @@ RESULT: REPRODUCED - environment variables were lost/overwritten
 The `--fixed` control run passes, which shows the problem is the modification of
 `os.environ` in `_call_method`.
 
+## Reproduction: Conan CLI (`cli/`)
+
+No Conan internals are called; the script only runs `conan ...` commands:
+
+1. starts a local `conan_server` (`pip install conan-server==2.32.0`) and uses a
+   fresh `CONAN_HOME` with `global.conf`:
+   ```
+   core.net.http:clean_system_proxy=True
+   core.download:parallel=2
+   ```
+2. creates and uploads 40 small binary packages (`cli/pkg`);
+3. runs `conan remove "*:*" -c` + `conan install` of `cli/consumer` many times,
+   with `NO_PROXY`, 250 random `RND_*` variables and `REPRO_CHECK_1..5` in the
+   environment. Every install downloads all 40 binaries in parallel threads.
+
+The consumer recipe calls `sys.setswitchinterval(1e-6)` at load time (override
+with `--switch-interval`) and in `generate()`, which runs after all downloads,
+compares `os.environ` with the environment Conan was started with (stored in a
+JSON file, because environment variables cannot be trusted here).
+
+```bat
+pip install conan==2.32.0 conan-server==2.32.0
+set NO_PROXY=localhost,127.0.0.1
+python cli\repro_cli.py --runs 20 --keep-going
+```
+
+Each run is classified as:
+
+* `REPRODUCED (env lost in recipe)` – `conan install` downloaded everything, but
+  `generate()` finds variables missing, e.g.
+  `REPRO: environment variables lost/overwritten after parallel download: missing=138 changed=0 checked=[REPRO_CHECK_1, ..., REPRO_CHECK_5] ...`.
+  This is the symptom from the issue (recipe / CMake sees no `SystemRoot`, ...).
+* `REPRODUCED (KeyError in download)` – a download fails because `os.environ`
+  changed under another thread, Conan prints e.g.
+  `Error downloading file http://127.0.0.1:.../conaninfo.txt: ''NO_PROXY''`.
+* `OK` – environment intact.
+
+Options: `--runs`, `--packages`, `--parallel`, `--random-vars`,
+`--switch-interval`, `--keep-going`, `--control` (same run with
+`clean_system_proxy=False`). Exit code `1` = reproduced, `2` = unexpected failure.
+
+Results on Linux, Python 3.8, 20 runs each:
+
+| Setup | OK | env lost | KeyError |
+| --- | --- | --- | --- |
+| `parallel=2`, switch 1e-6 (default) | 8 | 3 | 9 |
+| `parallel=8`, switch 5 ms (Python default) | 19 | 1 | 0 |
+| `--control` (`clean_system_proxy=False`) | 20 | 0 | 0 |
+
+With higher parallelism and 1e-6 almost every run fails with `KeyError` before
+reaching `generate()`, which is why the default is `parallel=2`.
+
 ## CI
 
 `.github/workflows/repro.yml` runs on `windows-2022` with Python 3.8:
@@ -116,6 +173,13 @@ The `--fixed` control run passes, which shows the problem is the modification of
 * `original` – Conan 2.32.0 as released, expected to **fail** (reproduced);
 * `control` – `repro.py --fixed --rounds 10`, expected to pass (one round takes
   ~30 s on the hosted Windows runner, the original code fails in round 1).
+
+`.github/workflows/repro-cli.yml` (separate workflow, Conan CLI):
+
+* `cli-original` – `repro_cli.py --runs 20 --keep-going`, expected to **fail**;
+* `cli-default-switch` – `--parallel 8 --switch-interval 0.005`, i.e. without any
+  interpreter tweak; expected to fail, but it is probabilistic;
+* `cli-control` – `--control`, expected to pass.
 
 ## Notes
 
